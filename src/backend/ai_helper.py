@@ -4,7 +4,7 @@ import threading
 
 from google import genai
 
-client = genai.Client(api_key=os.getenv("GEMINI_API_KEY", "AQ.Ab8RN6Ji5sohOaqSXMbpQEbqIGa6VIMLEov8WR0wbGQu7cgZgg"))
+client = genai.Client(api_key=os.getenv("GEMINI_API_KEY", "API KEY"))
 MODEL = "gemini-3.8-flash"
 
 
