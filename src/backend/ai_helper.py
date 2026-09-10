@@ -5,7 +5,7 @@ import threading
 from google import genai
 
 client = genai.Client(api_key=os.getenv("GEMINI_API_KEY", "AQ.Ab8RN6Ji5sohOaqSXMbpQEbqIGa6VIMLEov8WR0wbGQu7cgZgg"))
-MODEL = "gemini-1.5-turbo"
+MODEL = "gemini-3.8-flash"
 
 
 def _stream_image_description(image_path):
@@ -16,7 +16,7 @@ def _stream_image_description(image_path):
             f"Describe the content of this image in detail: {image_path}",
             uploaded_file,
         ],
-        config={"temperature": 0.5, "max_output_tokens": 200},
+        config={"temperature": 0.5, "system_instruction": "You are an AI assistant for artisans that provides image descriptions for e-commerce listings."},
     )
 
 
