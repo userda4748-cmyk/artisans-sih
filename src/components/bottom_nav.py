@@ -11,7 +11,8 @@ def bottom_nav(page: ft.Page):
             dashboard_btn,
             image_studio_btn,
             catalogue_btn
-        ]
+        ],
+        alignment = ft.MainAxisAlignment.CENTER
     )
     
     return bottom_nav
