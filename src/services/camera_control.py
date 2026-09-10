@@ -7,7 +7,6 @@ from src.backend.remove_bg import remove_background
 
 
 def get_camera_control(page: ft.Page, on_captured=None) -> ft.Control:
-    """Returns a container containing the camera viewfinder and AI background removal trigger."""
     camera_preview = fc.Camera(expand=True)
 
     captured_image = ft.Image(
@@ -20,7 +19,7 @@ def get_camera_control(page: ft.Page, on_captured=None) -> ft.Control:
         border_radius=12,
     )
 
-    loading_indicator = ft.ProgressRing(visible=False, width=24, height=24, color=ft.Colors.ORANGE_700)
+    loading_indicator = ft.ProgressRing(visible=False, width=24, height=24, color=ft.Colors.BLUE_700)
     status_text = ft.Text(visible=False, size=13, weight=ft.FontWeight.W_500)
 
     async def init_camera():
@@ -51,7 +50,7 @@ def get_camera_control(page: ft.Page, on_captured=None) -> ft.Control:
 
             captured_image.src = base64.b64encode(processed_png_bytes).decode("ascii")
             captured_image.visible = True
-            status_text.value = "Background removed! E-commerce ready PNG created."
+            status_text.value = "Background removed!"
             if on_captured:
                 on_captured(processed_png_bytes)
         except Exception as err:
@@ -103,7 +102,7 @@ def get_camera_control(page: ft.Page, on_captured=None) -> ft.Control:
 
 
 def camprev(page: ft.Page, on_back=None):
-    page.title = "AI Camera Studio - Shilp Setu"
+    page.title = "AI Camera Studio"
     control = get_camera_control(page)
 
     header_controls = []
