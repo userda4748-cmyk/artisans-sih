@@ -1,8 +1,11 @@
 import asyncio
 import base64
+import tempfile
 
 import flet as ft
 
+from src.components.top_bar import top_bar
+from src.backend.ai_helper import describe_image_stream
 from src.backend.remove_bg import remove_background
 from src.components.bottom_nav import bottom_nav
 from src.services.camera_control import get_camera_control
@@ -20,6 +23,15 @@ def image_studio(page: ft.Page):
     )
     upload_status = ft.Text(visible=False, size=13, weight=ft.FontWeight.W_500)
     upload_indicator = ft.ProgressRing(visible=False, width=24, height=24)
+    image_description = ft.TextField(
+        label="Image description",
+        multiline=True,
+        min_lines=4,
+        max_lines=8,
+        read_only=True,
+        visible=False,
+        expand=True,
+    )
     file_picker = ft.FilePicker()
     page.services.append(file_picker)
 
@@ -43,6 +55,8 @@ def image_studio(page: ft.Page):
         upload_indicator.visible = True
         upload_status.value = "AI is removing background..."
         upload_status.visible = True
+        image_description.value = ""
+        image_description.visible = True
         page.update()
 
         try:
@@ -51,7 +65,17 @@ def image_studio(page: ft.Page):
             )
             uploaded_image.src = base64.b64encode(processed_png_bytes).decode("ascii")
             uploaded_image.visible = True
-            upload_status.value = "Background removed!"
+            upload_status.value = "Generating image description..."
+            page.update()
+
+            with tempfile.NamedTemporaryFile(suffix=".png", delete=True) as temporary_image:
+                temporary_image.write(selected_file.bytes)
+                temporary_image.flush()
+                async for chunk in describe_image_stream(temporary_image.name):
+                    image_description.value += chunk
+                    page.update()
+
+            upload_status.value = "Background removed and description ready."
         except Exception as err:
             upload_status.value = f"Error: {err}"
         finally:
@@ -92,8 +116,10 @@ def image_studio(page: ft.Page):
 
     main_column = ft.Column(
         controls=[
+            top_bar(page),
             page_content,
             upload_result,
+            image_description,
             bottom_nav(page)
         ]
     )
