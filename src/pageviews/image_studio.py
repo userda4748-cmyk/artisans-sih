@@ -1,126 +1,96 @@
-import asyncio
 import base64
-import tempfile
-
+import asyncio
 import flet as ft
+import flet_camera as fc
 
-from src.components.top_bar import top_bar
-from src.backend.ai_helper import describe_image_stream
 from src.backend.remove_bg import remove_background
-from src.components.bottom_nav import bottom_nav
-from src.services.camera_control import get_camera_control
 
+def image_studio_view(page: ft.Page) -> ft.Control:
+    camera_preview = fc.Camera(expand=True)
 
-def image_studio(page: ft.Page):
-    page.title = "image studio"
-
-    uploaded_image = ft.Image(
+    captured_image = ft.Image(
         src="iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/wIAAgMBAp0YVwAAAABJRU5ErkJggg==",
         fit=ft.BoxFit.CONTAIN,
         visible=False,
-        height=220,
-        border_radius=12,
+        height=180,
+        border_radius=8,
     )
-    upload_status = ft.Text(visible=False, size=13, weight=ft.FontWeight.W_500)
-    upload_indicator = ft.ProgressRing(visible=False, width=24, height=24)
-    image_description = ft.TextField(
-        label="Image description",
-        multiline=True,
-        min_lines=4,
-        max_lines=8,
-        read_only=True,
-        visible=False,
-        expand=True,
-    )
-    file_picker = ft.FilePicker()
-    page.services.append(file_picker)
+    loading_indicator = ft.ProgressRing(visible=False, width=24, height=24)
+    status_text = ft.Text(visible=False, size=13)
 
-    async def upload_image(_e):
-        files = await file_picker.pick_files(
-            dialog_title="Choose an image",
-            file_type=ft.FilePickerFileType.IMAGE,
-            allowed_extensions=["jpg", "jpeg", "png", "webp"],
-            with_data=True,
-        )
-        if not files:
-            return
+    async def init_camera():
+        cameras = await camera_preview.get_available_cameras()
+        if cameras:
+            await camera_preview.initialize(
+                description=cameras[0],
+                resolution_preset=fc.ResolutionPreset.MEDIUM,
+            )
+        page.update()
 
-        selected_file = files[0]
-        if selected_file.bytes is None:
-            upload_status.value = "Could not read the selected image."
-            upload_status.visible = True
-            page.update()
-            return
-
-        upload_indicator.visible = True
-        upload_status.value = "AI is removing background..."
-        upload_status.visible = True
-        image_description.value = ""
-        image_description.visible = True
+    async def take_photo(_e):
+        loading_indicator.visible = True
+        status_text.value = "Removing background..."
+        status_text.visible = True
         page.update()
 
         try:
-            processed_png_bytes = await asyncio.to_thread(
-                remove_background, selected_file.bytes
-            )
-            uploaded_image.src = base64.b64encode(processed_png_bytes).decode("ascii")
-            uploaded_image.visible = True
-            upload_status.value = "Generating image description..."
-            page.update()
+            data = await camera_preview.take_picture()
+            if not data:
+                status_text.value = "No image was captured."
+                return
 
-            with tempfile.NamedTemporaryFile(suffix=".png", delete=True) as temporary_image:
-                temporary_image.write(selected_file.bytes)
-                temporary_image.flush()
-                async for chunk in describe_image_stream(temporary_image.name):
-                    image_description.value += chunk
-                    page.update()
+            processed_png_bytes = await asyncio.to_thread(remove_background, data)
+            base64_str = base64.b64encode(processed_png_bytes).decode("ascii")
+            
+            # Save into global app_data
+            if not hasattr(page, "app_data"):
+                page.app_data = {"user_name": "Artisan", "products": []}
+            if "products" not in page.app_data:
+                page.app_data["products"] = []
 
-            upload_status.value = "Background removed and description ready."
+            page.app_data["products"].append(base64_str)
+
+            captured_image.src = base64_str
+            captured_image.visible = True
+            status_text.value = "Background removed. Image added to Dashboard."
         except Exception as err:
-            upload_status.value = f"Error: {err}"
+            status_text.value = f"Background removal failed: {err}"
         finally:
-            upload_indicator.visible = False
+            loading_indicator.visible = False
             page.update()
 
-    capture_camera = ft.Row(
-        controls=[
-            get_camera_control(page)
-        ],
-        alignment=ft.MainAxisAlignment.CENTER,
-    )
-    upload_image_btn = ft.Button("Upload Image", on_click=upload_image)
+    page.run_task(init_camera)
 
-    page_content = ft.Column(
-        controls=[
-            capture_camera,
-            upload_image_btn
-        ],
-        alignment=ft.MainAxisAlignment.CENTER,
+    return ft.Container(
+        content=ft.Column(
+            controls=[
+                ft.Text("AI Image Studio", size=22, weight=ft.FontWeight.BOLD, color="teal"),
+                ft.Text("Capture your product image below", size=13, color=ft.Colors.GREY_700),
+                ft.Container(
+                    content=camera_preview,
+                    height=280,
+                    bgcolor=ft.Colors.BLACK,
+                    border_radius=12,
+                    clip_behavior=ft.ClipBehavior.HARD_EDGE,
+                ),
+                ft.FloatingActionButton(
+                    icon=ft.Icons.CAMERA,
+                    bgcolor="teal",
+                    foreground_color="white",
+                    tooltip="Take photo",
+                    on_click=take_photo,
+                ),
+                ft.Row(
+                    controls=[loading_indicator, status_text],
+                    alignment=ft.MainAxisAlignment.CENTER,
+                    spacing=8,
+                ),
+                captured_image,
+            ],
+            horizontal_alignment=ft.CrossAxisAlignment.CENTER,
+            spacing=12,
+        ),
+        alignment=ft.Alignment(0, -1),
+        padding=15,
+        expand=True,
     )
-
-    upload_result = ft.Column(
-        controls=[
-            ft.Row(
-                controls=[upload_indicator, upload_status],
-                alignment=ft.MainAxisAlignment.CENTER,
-                spacing=12,
-            ),
-            ft.Container(
-                content=uploaded_image,
-                alignment=ft.Alignment.CENTER,
-                margin=ft.Margin.only(top=8),
-            ),
-        ],
-        horizontal_alignment=ft.CrossAxisAlignment.CENTER,
-    )
-
-    main_column = ft.Column(
-        controls=[
-            top_bar(page),
-            page_content,
-            upload_result,
-            image_description,
-            bottom_nav(page)
-        ]
-    )
-    page.add(main_column)

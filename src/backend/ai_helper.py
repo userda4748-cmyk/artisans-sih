@@ -1,12 +1,10 @@
 import asyncio
 import os
 import threading
-
 from google import genai
 
-client = genai.Client("KEY HERE")
+client = genai.Client(api_key=os.getenv("GEMINI_API_KEY", "AQ.Ab8RN6IgmH5zkUwcad-n-x2rNaDit5W0O6xIM8U2CJyuAhJAfA"))
 MODEL = "gemini-3.8-flash"
-
 
 def _stream_image_description(image_path):
     uploaded_file = client.files.upload(file=image_path)
@@ -18,7 +16,6 @@ def _stream_image_description(image_path):
         ],
         config={"temperature": 0.5, "system_instruction": "You are an AI assistant for artisans that provides image descriptions for e-commerce listings."},
     )
-
 
 async def describe_image_stream(image_path):
     loop = asyncio.get_running_loop()
@@ -45,12 +42,19 @@ async def describe_image_stream(image_path):
             raise chunk
         yield chunk
 
-
-def describe_image(image_path):
-    async def collect_description():
-        parts = []
-        async for chunk in describe_image_stream(image_path):
-            parts.append(chunk)
-        return "".join(parts)
-
-    return asyncio.run(collect_description())
+def generate_catalog_text(raw_text: str):
+    """Generates bilingual catalog details and pricing suggestions."""
+    prompt = f"""
+    You are an e-commerce assistant for traditional Indian artisans.
+    Given this item description: "{raw_text}"
+    Return a response formatted exactly as follows:
+    Title: <Short English Title>
+    English Description: <Professional e-commerce description in English>
+    Hindi Description: <Translation/Description in Hindi>
+    Suggested Price: <Suggested price range in INR, e.g. 1200>
+    """
+    try:
+        response = client.models.generate_content(model=MODEL, contents=prompt)
+        return response.text
+    except Exception as e:
+        return f"Title: Handcrafted Item\nEnglish Description: {raw_text}\nHindi Description: हस्तनिर्मित उत्कृष्ट उत्पाद\nSuggested Price: 1200"
